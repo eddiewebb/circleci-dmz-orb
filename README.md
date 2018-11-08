@@ -13,7 +13,7 @@ Allows CircleCI builds to access private network services over a intermediate ju
 version: 2.1
 
 orbs:
-  dmz: eddiewebb/dmz@dev:local
+  dmz: eddiewebb/dmz@volatile
 
 workflows:
   test_all:
