@@ -2,6 +2,10 @@
 
 Allows CircleCI builds to access private network services over a intermediate jump host using SSH port forwarding.
 
+
+![Image showing traffic flow from CircleCI, through Jump Host to target server on private network](/assets/bastion.png)
+**Note**: port 3306 represents the local port, in this example for a DB connection, but can be any available port.
+
 ## Examples
 
 ```
