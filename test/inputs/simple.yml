@@ -1,0 +1,15 @@
+jobs:
+  build:
+    docker:
+      - image: circleci/node:10
+    steps:
+      - checkout
+      - dmz/open_tunnel:
+          local_port: "9001"
+          target_host: "104.154.89.105"
+          target_port: "80"
+          bastion_user: ubuntu
+          bastion_host: ec2-18-191-19-150.us-east-2.compute.amazonaws.com 
+      # and simply confirm that accessing local port resolves the target (in this case an HTTP server)
+      - run: curl localhost:9001
+  
