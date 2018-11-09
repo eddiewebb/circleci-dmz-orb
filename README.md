@@ -9,6 +9,8 @@ Allows CircleCI builds to access private network services over a intermediate ju
 
 ## Examples
 
+Full usage examples can be found under the `examples` key in the [orb's source](/src/orb.yml#L67)
+
 ```
 version: 2.1
 
