@@ -1,0 +1,157 @@
+version: 2.1
+description: "Allows CircleCI builds to access private network services over a intermediate jump host using SSH port forwarding."
+commands:
+  open_tunnel:
+    parameters:
+      local_port:
+        type: string
+        default: "443"
+        description: "The port to expose locally, most likely matches your target port"
+      bastion_host:
+        type: string
+        description: "The hostname or IP of your jump host in exposed DMZ"
+      bastion_user:
+        type: string
+        description: "The username on your jump host in exposed DMZ that matches SSH keys provided"
+      bastion_public_key:
+        type: string
+        description: "The public key of the bastion host to ensure mutual trust.  Argument may be a value, ENV VAR name, or file path. If left empty `ssh keyscan <bastion_host>` will trust it dynamically. "
+        default: ""
+      target_host:
+        type: string
+        description: "The hostname or IP of your target service on private network"
+      target_port:
+        type: string
+        default: "443"
+        description: "The port of your target service on private network"
+    steps:
+      - add_ssh_keys # this command will add the keys configured in the UI
+      - when:
+          condition: <<parameters.bastion_public_key>>
+          steps:
+            - run: 
+                name: Trust provided Public Key for <<parameters.bastion_host>> 
+                command: |
+                  if [ ! -d ~/.ssh ];then
+                    echo "No .ssh folder exists, please add private keys to SSH Permissions in Project Config (UI)"
+                    exit 1
+                  fi
+                  # the above step handled our private key, but we still need to trust the *public* key of the bastion host by adding them to known_hosts 
+                  if [ -f "<<parameters.bastion_public_key>>" ];then
+                    # parameter is file, cat it
+                    KEY_VALUE=`cat <<parameters.bastion_public_key>>`
+                  else
+                    #parameter is not file, assume variable or string, echo it
+                    KEY_VALUE=`echo "<<parameters.bastion_public_key>>"`
+                  fi
+                  echo "<<parameters.bastion_host>> ${KEY_VALUE}" >> ~/.ssh/known_hosts
+      - unless:
+          condition: <<parameters.bastion_public_key>>
+          steps:
+            - run: 
+                name: Trust Public Key for <<parameters.bastion_host>> using keyscan
+                command: |
+                  if [ ! -d ~/.ssh ];then
+                    echo "No .ssh folder exists, please add private keys to SSH Permissions in Project Config (UI)"
+                    exit 1
+                  fi
+                  # the above step handled our private key, but we still need to trust the *public* key of the bastion host by adding them to known_hosts 
+                  ssh-keyscan <<parameters.bastion_host>> >> ~/.ssh/known_hosts
+      - run:
+          name: Open Local Port Forwarding on <<parameters.local_port>> to <<parameters.target_host>>:<<parameters.target_port>> via <<parameters.bastion_host>>
+          command: |
+            ssh -L <<parameters.local_port>>:<<parameters.target_host>>:<<parameters.target_port>> -Nf <<parameters.bastion_user>>@<<parameters.bastion_host>> || true
+
+
+
+examples:
+  providing_key_as_path:
+    description: If the bastion host's public key is in the repository, you can point to the path to trust it.
+    usage:
+      version: 2.1
+      orbs:
+        dmz: eddiewebb/dmz@volatile
+      jobs:
+        build: #this job uses a *public* key file within the repo to be explicitly trusted
+          docker:
+            - image: circleci/node:10
+          steps:
+            - checkout
+            - dmz/open_tunnel:
+                local_port: "9001"
+                target_host: target-host.domain
+                target_port: "80"
+                bastion_user: ubuntu
+                bastion_host: jump-host.domain
+                bastion_public_key: path/to/bastion.pub
+            # and simply confirm that accessing local port resolves the target (in this case an HTTP server)
+            - run: curl localhost:9001
+  explicit_value:            
+    description: The bastion host's public key can be declated explicitly, or pulled from an env var instead.
+    usage:
+      version: 2.1
+      orbs:
+        dmz: eddiewebb/dmz@volatile
+      jobs:
+        build: #this job uses a *public* key file within the repo to be explicitly trusted
+          docker:
+            - image: circleci/node:10
+          steps:
+            - checkout
+            - dmz/open_tunnel:
+                local_port: "9001"
+                target_host: target-host.domain
+                target_port: "80"
+                bastion_user: ubuntu
+                bastion_host: jump-host.domain
+                bastion_public_key: 'ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoY............'
+                  #    OR 
+                #bastion_public_key: ${THE_VARIABLE_WITH_PUBLIC_KEY_STRING}
+                
+            # and simply confirm that accessing local port resolves the target (in this case an HTTP server)
+            - run: curl localhost:9001
+  naive_trust:
+    description: You can let `ssh-keyscan` ask the bastion host for its public key and trust that. **WARNING** this method is vulnerable to MITM attacks.
+    usage:
+      version: 2.1
+      orbs:
+        dmz: eddiewebb/dmz@volatile
+      jobs:
+        build: #this job uses a *public* key file within the repo to be explicitly trusted
+          docker:
+            - image: circleci/node:10
+          steps:
+            - checkout
+            - dmz/open_tunnel:
+                local_port: "9001"
+                target_host: target-host.domain
+                target_port: "80"
+                bastion_user: ubuntu
+                bastion_host: jump-host.domain
+            # and simply confirm that accessing local port resolves the target (in this case an HTTP server)
+            - run: curl localhost:9001
+
+  not_just_http:
+    description: It doesnt have to be a web-server being accessed. You can access a remote SSH host through the intermediate, just add -p to ssh commands.
+    usage:
+      version: 2.1
+      orbs:
+        dmz: eddiewebb/dmz@volatile
+      jobs:
+        build: #this job uses a *public* key file within the repo to be explicitly trusted
+          docker:
+            - image: circleci/node:10
+          steps:
+            - checkout
+            - dmz/open_tunnel:
+                local_port: "9001"
+                target_host: target-host.domain
+                target_port: "22"
+                bastion_user: ubuntu
+                bastion_host: jump-host.domain
+                bastion_public_key: 'ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoY............'
+            # and simply confirm that accessing local port resolves the target (in this case an HTTP server)
+            - run: |
+                ssh-keyscan -p 9022 localhost >> ~/.ssh/known_hosts  #not required if you also trust the both server's keys explicitly
+                ssh ec2-user@localhost -p 9022 'whoami && hostname'
+
