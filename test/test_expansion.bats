@@ -39,12 +39,3 @@ function setup {
   assert_jq_contains '.jobs["build"].steps[2].run.command' 'KEY_VALUE=`echo "somefile"`'
   assert_jq_contains '.jobs["build"].steps[2].run.command' 'echo "ec2-18-191-19-150.us-east-2.compute.amazonaws.com ${KEY_VALUE}" >> ~/.ssh/known_hosts'
 }
-
-
-
-
-
-
-
-
-
