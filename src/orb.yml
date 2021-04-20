@@ -60,7 +60,8 @@ commands:
       - run:
           name: Open Local Port Forwarding on <<parameters.local_port>> to <<parameters.target_host>>:<<parameters.target_port>> via <<parameters.bastion_host>>
           command: |
-            ssh -4 -L <<parameters.local_port>>:<<parameters.target_host>>:<<parameters.target_port>> -Nf <<parameters.bastion_user>>@<<parameters.bastion_host>>
+            ssh -o ExitOnForwardFailure=yes -4 -L <<parameters.local_port>>:<<parameters.target_host>>:<<parameters.target_port>> -Nf <<parameters.bastion_user>>@<<parameters.bastion_host>>
+            sleep 5
 
 
 
